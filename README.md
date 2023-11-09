@@ -1,6 +1,6 @@
 # DFRobot-Maqueenplus-Python
 
-Python library for maqueenplus robot developed by DFRobot. 
+Python library for the Maqueen Plus robot developed by DFRobot. 
 
 This library is a python version of the one proposed by DFRobot used for block coding. 
 
@@ -15,59 +15,83 @@ Link to DFRobot page : [https://www.dfrobot.com/product-2026.html]
 Instantiate the robot object 
 
 ```python
-from microbit import *
-from lib_robot_maqueen import Robot
+import microbit
+import lib_robot_maqueen as mqn
 import time #can be removed if not used
 
-mq = Robot()
+mq = mqn.MaqueenPlus()
 ```
 
 # Methods 
 
-- Move the robot
-
+### Move the robot
 Move the robot along 4 axis :
-    * TD -> forward
-    * AR -> backward 
-    * G -> left
-    * D -> right 
+- F -> forward
+- B -> backward 
+- L -> left
+- R -> right 
 
 Function definition :
 ```python
-def direction(speed, dir):
+def move(speed, dir):
     """
     speed(pwm) : 0 -> 255
-    dir(string) : "TD" or "AR" or "G" or "D"
+    dir(string) : "F" or "B" or "L" or "R"
     """
 ```
 
 Example :
 ```python 
-    mq.direction(70, "TD")
+    mq.move(70, "F")
     time.sleep(1) #wait for 1s
-    mq.direction(70, "D")
+    mq.move(70, "R")
 ```
 
-To move the robot you can also use the run method.
+To move the robot you can also use the motorControl method.
 
 Function definition :
 ```python
-def run(self, mot, sens, vit):
+def motorControl(self, mot, dir, spd):
     """
-        mot left: MG ; mot right: MD
-        sens (forward) : 1; sens (backward) :2
-        vit max :255; arret :0
+        mot left: MT_L ; mot right: MT_R
+        dir (forward): 1; dir (backward): 2
+        spd max: 255; stop: 0
     """
 ```
 
 Example :
 ```python 
-    mq.run(mq.MG,2,50)
-    mq.run(mq.MD,2,70)
+    mq.motorControl(mq.MT_L,2,50)
+    mq.motorControl(mq.MT_R,2,70)
 ```
 
-- Stop 
+### Move the robot for a precise distance
+MaqueenPlus is equipped with wheel encoders. The function goto uses the wheel encoders to turn or move the robot over an exact number of encoder ticks:
+- F -> drive a number of encoder ticks forward
+- L -> turn left for a number of encoder ticks
+- R -> turn right for a number of encoder ticks
 
+Function definition :
+```python
+def goto(self, dir, spd, dist):
+    """
+        mot left: MT_L ; mot right: MT_R
+        dir(string) : "F" or "L" or "R"
+        spd max: 255; stop: 0
+        dist: the number of encoder ticks the robot should move
+    """
+```
+
+Example :
+```python
+    # drive forward with PWM speed 200 for 400 encoder ticks
+    mq.goto("F", 200, 400)
+
+    # turn left with PWM speed 70 for 144 ticks (about 180 degrees)
+    mq.goto("L", 70, 144)
+```
+
+### Stop 
 Stop the robot 
 
 Function definition:
@@ -82,8 +106,7 @@ Example:
     mq.stop()
 ```
 
-- Control ServoMotor
-
+### Control ServoMotor
 You can move three servos with the version of the library, S1, S2, S3.
 
 Function definition:
@@ -104,45 +127,45 @@ Example:
     mq.servo(mq.S3,0)
 ```
 
-- Line tracking sensor
-
-Read line tracking sensor state for a given sensor.
-All the functions proposed by DFRobot have not been implemented.
+### Line tracking sensor
+Read line tracking sensor state.
+Not all the functions proposed by DFRobot have been implemented.
 It is up to you to do so.
 
-Function declaration:
+Function definition:
 ```python
-    def readLineSensor(self, sensor_name):
-        """Read line tracking state for a given sensor
-
-        Args:
-            sensor_name (int): object attribut define in constructor (R1,R2,R3,L1,L2,L3)
+    def getLine(self):
+        """Read line tracking state
 
         Returns:
-            [int]: 0 : black / 1 : white 
+            dictionary of [int]: 0 : white / 1 : black
+            valid keys for the dictionary are: "L3", "L2", "L1", "R1", "R2", "R3"
         """
 ```
 
 Example:
+
 ```python
-    #Read R1 (Right #1) line tracking sensor state
-    state = mq.readLineSensor(mq.R1)
-    
-    #you can display the value by doing :
-    #display.show(state)
+    #Read line tracking sensor state
+    line = mq.getLine()
+    print(line["L1"])
+    print(line["R1"])
 ```
 
-- Ultrasonic sensor 
+### Ultrasonic sensor 
+Get the distance between the robot and an object. An optional argument maxDist was added so you can choose the range of the sensor, which can be important to limit delays in your program. The default setting is 0.4 meters.
 
-Get the distance between the robot and an object.
-
-Function defition:
+Function definition:
 ```python
-    def ultrasonic(self):
+    def ultrasonic(self,maxDist=0.4):
         """Get the distance between the robot and an object.
 
+        Args:
+            [float, optional] The maximum distance in meters
+                              If function is called with no arguments, defaults to 0.4
+
         Returns:
-            [float]: distance to the object if one is detected else max value.
+            [float]: distance to the object if one is detected, else max value.
         """
 ```
 
@@ -150,17 +173,17 @@ Example:
 
 ```python
     distance = mq.ultrasonic()
+    distance = mq.ultrasonic(0.8)
 ```
 
-- Motor Speed 
-
+### Motor Speed 
 Get the linear speed of a given motor. 
 INFO : This method has no been tested yet but you can test it and set an issue for feedback. 
 
 
-Function defition:
+Function definition:
 ```python
-    def motor_speed(self, mot):
+    def motorSpeed(self, mot):
         """Get the linear speed of a given motor 
 
         Args:
@@ -174,21 +197,21 @@ Function defition:
 Example:
 
 ```python
-    mq.direction(70, "TD")
+    mq.move(70, "F")
     time.sleep(1) #delay is necessary. Otherwise the robot read the speed before the motor started.
-    vitesse = mq.vitesse_moteur(mq.MG)
-    display.show(str(vitesse))
+    spd = mq.motorSpeed(mq.MT_L)
+    display.show(str(spd))
     time.sleep(5)
     mq.stop()
 ```
 
-- RGB Lights
-Turn on/off the rbg light of your choice with the color you want.
+### RGB Lights
+Turn on/off the rgb light of your choice with the color you want.
 
 * RGB LED choice:
-REB_G : left led,
-REB_D : right led,
-REB_G_D : center led
+RGB_L : left led,
+RGB_R : right led,
+RGB_ALL : both leds
 
 * Color choice:
 RED,
@@ -208,9 +231,9 @@ Function declaration:
 
         Args:
             rgbshow (int): rgb light object attribute defined in the constructor :
-                REB_G : left led,
-                REB_D : right led,
-                REB_G_D : center led
+                RGB_L : left led,
+                RGB_R : right led,
+                RGB_ALL : both leds
 
             color (int): color of the led:
                 RED,GREEN,
@@ -222,9 +245,44 @@ Function declaration:
 
 Example:
 ```python
-    mq.RGBLight(mq.RGB_G,mq.RED)
+    mq.RGBLight(mq.RGB_L,mq.RED)
 ```
 
+### Read Encoders
+Read the values of the wheel encoders
 
-# Updates 
-One major update that should be added soon concerns the rotation movements of the robot. In fact, when we ask the robot to move right of left no information is given concerning the angle to rotate. Only time.sleep(_) is used actually which is not accurate.
+Function definition:
+```python
+    def getEncoders(self):
+        """Read the values of the wheel encoders
+        
+        Returns:
+            [tuple of 2 int's]: Value of the left encoder and right encoder
+        """
+```
+
+Example:
+```python
+    encoders = mq.getEncoders()
+    print(encoders[0])
+    print(encoders[1])
+```
+
+### Clear Encoders 
+Reset the values of the wheel encoders to 0
+
+Function definition:
+```python
+    def clearEncoders(self):
+        """Reset the values of the wheel encoders to 0
+        """
+```
+
+Example:
+```python
+    mq.clearEncoders()
+```
+
+### Version history
+- Version 1.0: Initial version
+- Version 2.0: Compacted code style (short variable names, delete unnecessary space characters) to work around memory constraints and find space for adding functionality. Added goto function for moving the robot with use of the decoders. Added optional maximum distance argument to the ultrasonic function. Should still work with the micro:bit V1. if more functions to this library are added, you will probably need to equip your Maqueen Plus with the micro:bit V2. I am considering making a separate version of this library for the micro:bit V2

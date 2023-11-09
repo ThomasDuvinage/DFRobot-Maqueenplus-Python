@@ -1,232 +1,152 @@
-import microbit
+import microbit as mb
 import machine
+import struct
 import time
+adr=0x10
 
+class MaqueenPlus:
+  def __init__(self):
+    mb.i2c.init(freq=100000,sda=mb.pin20,scl=mb.pin19)
+    # Motors
+    self.MT_L=0
+    self.MT_R=1
 
-class Robot:
-    def __init__(self):
-        self._vit = 0
-        microbit.i2c.init(freq=100000, sda=microbit.pin20, scl=microbit.pin19)
-        # Motors
-        self.MG = 0
-        self.MD = 1
+    # ServoMotors
+    self.S1=1
+    self.S2=2
+    self.S3=3
 
-        # ServoMotors
-        self.S1 = 1
-        self.S2 = 2
-        self.S3 = 3
+    # RGB LED
+    self.RGB_L=1
+    self.RGB_R=2
+    self.RGB_ALL=3
+    self.RED=1
+    self.GREEN=2
+    self.BLUE=4
+    self.YELLOW=3
+    self.PINK=5
+    self.CYAN=6
+    self.WHITE=7
+    self.OFF=8
 
-        # RGB LED
-        self.RGB_G = 1
-        self.RGB_D = 2
-        self.RGB_G_D = 3
-        self.RED = 1,
-        self.GREEN = 2,
-        self.BLUE = 4,
-        self.YELLOW = 3,
-        self.PINK = 5,
-        self.CYAN = 6,
-        self.WHITE = 7,
-        self.OFF = 8
+    # Linetrack sensors
+    self.patrol={
+     "L1":0x04,
+     "L2":0x02,
+     "L3":0x01,
+     "R1":0x08,
+     "R2":0x10,
+     "R3":0x20
+    }
 
-        # Line tracking sensors
-        self.L1 = 1
-        self.L2 = 2
-        self.L3 = 5
-        self.R1 = 3
-        self.R2 = 4
-        self.R3 = 6
+  def motorControl(self,mot,dir,spd):
+    buf=bytearray(3)
+    if mot==self.MT_L:
+      buf[0]=0x00
+    else:
+      buf[0]=0x02
+    buf[1]=dir
+    buf[2]=spd
+    mb.i2c.write(adr,buf)
 
-    def run(self, mot, sens, vit):
-        # mot left:0 ; mot right:1
-        # sens forward : 1; sens backward :2
-        # speed max :255; stop :0
-        buf = bytearray(3)
-        if mot == self.MG:
-            buf[0] = 0x00
-        else:
-            buf[0] = 0x02
-        buf[1] = sens
-        buf[2] = vit
-        microbit.i2c.write(0x10, buf)
+  def go(self,dL,sL,dR,sR):
+    self.motorControl(self.MT_L,dL,sL)
+    self.motorControl(self.MT_R,dR,sR)
 
-    def servo(self, number, angle):
-        """Move a servo for a given angle
+  def servo(self,num,angle):
+    buf=bytearray(3)
+    if num==self.S1:
+      buf[0]=0x14
+    elif num==self.S2:
+      buf[0]=0x15
+    else:
+      buf[0]=0x16
+    buf[1]=angle
+    mb.i2c.write(adr,buf)
 
-        Args:
-            number (int): number of the servo to move
-            angle (int): rotating angle (min=0  max=180)
-        """
-        buf = bytearray(3)
-        if number == self.S1:
-            buf[0] = 0x14
-            buf[1] = angle
-            microbit.i2c.write(0x10, buf)
-        elif number == self.S2:
-            buf[0] = 0x15
-            buf[1] = angle
-            microbit.i2c.write(0x10, buf)
-        else:
-            buf[0] = 0x16
-            buf[1] = angle
-            microbit.i2c.write(0x10, buf)
+  def RGBLight(self,rgbshow,color):
+    buf=bytearray(3)
+    buf[0]=0x0B
+    buf[1]=color
+    if rgbshow==self.RGB_R:
+      buf[0]=0x0C
+    elif rgbshow==self.RGB_ALL:
+      buf[2]=color
+    mb.i2c.write(adr,buf)
 
-    def RGBLight(self, rgbshow, color):
-        """Turn on/off the rbg light of your choice with the color you want.
+  def stop(self):
+    self.go(1,0,1,0)
 
+  def move(self,dir,spd):
+    if dir=="F":
+      self.go(1,spd,1,spd)
+    elif dir=="L":
+      self.go(1,0,1,spd)
+    elif dir=="R":
+      self.go(1,spd,1,0)
+    elif dir=="B":
+      self.go(2,spd,2,spd)
 
-        Args:
-            rgbshow (int): rgb light object attribute defined in the constructor :
-                REB_G : left led,
-                REB_D : right led,
-                REB_G_D : center led
+  def goto(self,dir,spd,dst):
+    en=self.getEncoders()
+    goal=dst
+    if dir=="F":
+      goal+=en[0]
+      while en[0]<goal:
+        self.go(1,spd,1,spd)
+        en=self.getEncoders()
+    if dir=="L":
+      goal+=en[1]
+      while en[1]<goal:
+        self.go(1,0,1,spd)
+        en=self.getEncoders()
+    elif dir=="R":
+      goal+=en[0]
+      while en[0]<goal:
+        self.go(1,spd,1,0)
+        en=self.getEncoders()
+    self.stop()
 
-            color (int): color of the led:
-                RED,GREEN,
-                BLUE,YELLOW,
-                PINK,CYAN,
-                WHITE, OFF
-        """
-        buf = bytearray(3)
-        if rgbshow == self.RGB_G:
-            buf[0] = 0x0B
-            buf[1] = color
-            microbit.i2c.write(0x10, buf)
-        elif rgbshow == self.RGB_D:
-            buf[0] = 0x0C
-            buf[1] = color
-            microbit.i2c.write(0x10, buf)
-        elif rgbshow == self.RGB_G_D:
-            buf[0] = 0x0B
-            buf[1] = color
-            buf[2] = color
-            microbit.i2c.write(0x10, buf)
+  def ultrasonic(self, maxDist=0.4):
+  # pins: trig=2, echo=8
+    mb.pin2.write_digital(1)
+    time.sleep_us(10)
+    mb.pin2.write_digital(0)
+    mb.pin8.read_digital()
+    timeOut=int(maxDist*2*1000000/340.29)
+    t2 = machine.time_pulse_us(mb.pin8, 1, timeOut)
+    if t2>0:
+      dst=340.29*(t2/(2*1000000))
+    else:
+      dst=maxDist
+    return dst
 
-    def stop(self):
-        """Stop the robot 
-        """
-        self.run(self.MG, 1, 0)
-        self.run(self.MD, 1, 0)
-        microbit.display.show('S')
+  def getLine(self):
+    mb.i2c.write(adr,b'\x1D')
+    patrol_y=mb.i2c.read(adr,1)
+    sens={
+     "L1":-1,
+     "L2":-1,
+     "L3":-1,
+     "R1":-1,
+     "R2":-1,
+     "R3":-1
+    }
+    for x in self.patrol:
+      if((patrol_y[0] & self.patrol[x])==self.patrol[x]):
+        sens[x]=1
+      else:
+        sens[x]=0
+    return sens
 
-    def direction(self, vit, dir):
-        """  
-        Move the robot along 4 axis :
-            * TD -> forward
-            * AR -> backward 
-            * G -> left
-            * D -> right 
+  def getEncoders(self):
+    buf=bytearray(1)
+    buf[0]=0x04
+    mb.i2c.write(adr,buf)
+    return struct.unpack('>HH',mb.i2c.read(adr,4))
 
-        Args:
-            vit(pwm) : 0 -> 255
-            dir(string) : "TD" or "AR" or "G" or "D"
-        """
-
-        if(dir == "TD"):
-            self.run(0, 1, vit)
-            self.run(1, 1, vit)
-
-        elif(dir == "D"):
-            self.run(0, 1, vit)
-            self.run(1, 1, 0)
-
-        elif(dir == "G"):
-            self.run(0, 1, 0)
-            self.run(1, 1, vit)
-
-        elif(dir == "AR"):
-            self.run(0, 2, vit)
-            self.run(1, 2, vit)
-
-    def ultrasonic(self):
-        """Get the distance between the robot and an object.
-
-        Returns:
-            [float]: distance to the object it one is detected else max value.
-        """
-        #trig_pin = pin1, echo_pin = pin2
-        microbit.pin1.write_digital(1)
-        time.sleep_ms(10)
-        microbit.pin1.write_digital(0)
-
-        microbit.pin2.read_digital()
-        t2 = machine.time_pulse_us(microbit.pin2, 1)
-        distance = 340.29 * (t2 / (2*1000000))
-
-        return distance
-
-    def readLineSensor(self, sensor_name):
-        """Read line tracking state for a given sensor
-
-        Args:
-            sensor_name (int): object attribut define in constructor 
-
-        Returns:
-            [int]: 0 : black / 1 : white 
-        """
-        microbit.i2c.write(0x10, b'\x1D')
-        # 0x10 -> adresse / 1 -> lecture de 1 byte
-        patrol_y = microbit.i2c.read(0x10, 1)
-        mark = -1
-
-        if (sensor_name == self.L1):
-            if((patrol_y[0] & 0x04) == 0x04):
-                mark = 1
-            else:
-                mark = 0
-        if (sensor_name == self.L2):
-            if((patrol_y[0] & 0x02) == 0x02):
-                mark = 1
-            else:
-                mark = 0
-        if (sensor_name == self.R1):
-            if((patrol_y[0] & 0x08) == 0x08):
-                mark = 1
-            else:
-                mark = 0
-        if (sensor_name == self.R2):
-            if((patrol_y[0] & 0x10) == 0x10):
-                mark = 1
-            else:
-                mark = 0
-        if (sensor_name == self.L3):
-            if((patrol_y[0] & 0x01) == 0x01):
-                mark = 1
-            else:
-                mark = 0
-        if (sensor_name == self.R3):
-            if((patrol_y[0] & 0x20) == 0x20):
-                mark = 1
-            else:
-                mark = 0
-
-        return mark
-
-    def motor_speed(self, mot):
-        """Get the linear speed of a given motor 
-
-        Args:
-            mot (int): object attribut define in constructor (MG, MD)
-
-        Returns:
-            [type]: [description]
-        """
-        microbit.i2c.write(0x10, b'\x00')
-        # 0x10 -> adresse / 4 -> lecture de 4 bytes
-        speed_x = microbit.i2c.read(0x10, 4)
-        return_speed = -1
-
-        # 0 -> G / 1 -> D
-        if(mot == self.MG):
-            if(round(speed_x[1]) < 20 and round(speed_x[1]) != 0):
-                return_speed = round(speed_x[1]) + 255
-            else:
-                return_speed = round(speed_x[1])
-
-        elif(mot == self.MD):
-            if(round(speed_x[3]) < 20 and round(speed_x[3]) != 0):
-                return_speed = round(speed_x[3]) + 255
-            else:
-                return_speed = round(speed_x[3])
-
-        return return_speed
+  def clearEncoders(self):
+    buf=bytearray(5)
+    buf[0]=0x04
+    buf[1]=buf[2]=buf[3]=buf[4]=0x00
+    mb.i2c.write(adr,buf)

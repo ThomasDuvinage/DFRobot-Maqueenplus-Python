@@ -1,16 +1,16 @@
-from microbit import *
+import microbit
 import machine
-from lib_robot_maqueen import Robot
+import lib_robot_maqueen as mqn
 import time
 
-mq = Robot()
+mq = mqn.MaqueenPlus()
 
 #### Example #####
 
-mq.direction(70, "TD")
+mq.move(70, "F")
 time.sleep(1)
-mq.direction(70, "D")
+mq.move(70, "R")
 
 ##################
 
-# add you code here... :-)
+# add your code here... :-)
